@@ -5,14 +5,14 @@ import json
 app = Flask(__name__)
 
 # Update the redirect URI to the one provided by Render
-redirect_uri = 'https://your-app-name.onrender.com/callback'
+redirect_uri = 'https://ivry100.onrender.com/callback'
 
 # Your Trackimo API credentials
 server_url = 'https://app.trackimo.com'
-user_name = 'trackimodemouser@trackimo.com'
-password = 'A1abcdef'
-client_id = 'bcf96758-9c87-4945-8c1e-e0bee2a4cb31'
-client_secret = '5b95ce525f9e1a47bef42f4a85dd3500'
+user_name = 'dan.uc.advisors@gmail.com'
+password = 'BuleBule222'
+client_id = '878b7a60-b504-44c5-bda9-bf6938c5fa29'
+client_secret = '58d898c4769c6b9f78c8a39db2feca97'
 
 def do_login_and_get_access_token():
     resp = requests.post(
