@@ -1,11 +1,9 @@
-from flask import Flask, request, redirect, jsonify
+
+import os
 import requests
-import json
+from flask import Flask, redirect, request, jsonify
 
 app = Flask(__name__)
-
-# Update the redirect URI to the one provided by Render
-redirect_uri = 'https://ivry100.onrender.com/callback'
 
 # Your Trackimo API credentials
 server_url = 'https://app.trackimo.com'
@@ -13,82 +11,67 @@ user_name = 'dan.uc.advisors@gmail.com'
 password = 'BuleBule222'
 client_id = '878b7a60-b504-44c5-bda9-bf6938c5fa29'
 client_secret = '58d898c4769c6b9f78c8a39db2feca97'
+redirect_uri = 'https://ivry100.onrender.com/callback'
 
-def do_login_and_get_access_token():
-    resp = requests.post(
-        f"{server_url}/api/internal/v2/user/login",
-        headers={"Content-Type": "application/json"},
-        json={"username": user_name, "password": password},
-    )
-    if resp.status_code != 200:
-        raise Exception(f"Login failed: {resp.status_code} {resp.text}")
-    cookies = dict(resp.cookies)
-
-    oauth_resp = requests.get(
-        f"{server_url}/api/v3/oauth2/auth",
-        params={
-            "client_id": client_id,
-            "redirect_uri": redirect_uri,
-            "response_type": "code",
-            "scope": "locations,notifications,devices,accounts,settings,geozones",
-        },
-        cookies=cookies,
-        allow_redirects=False,
-    )
-    if oauth_resp.status_code != 302:
-        raise Exception(f"OAuth authorization failed: {oauth_resp.status_code} {oauth_resp.text}")
-
-    location = oauth_resp.headers.get("Location")
-    if not location:
-        raise Exception("Authorization failed: Location header is missing in the response.")
-    
-    code = location.split("=")[1]
-
-    token_resp = requests.post(
-        f"{server_url}/api/v3/oauth2/token",
-        headers={"Content-Type": "application/json"},
-        json={"client_id": client_id, "client_secret": client_secret, "code": code},
-        cookies=cookies,
-    )
-    if token_resp.status_code != 200:
-        raise Exception(f"Token request failed: {token_resp.status_code} {token_resp.text}")
-
-    return json.loads(token_resp.content).get('access_token')
-
-
+# The route that triggers the OAuth login flow
 @app.route('/')
 def index():
-    # This route starts the OAuth process
-    access_token = do_login_and_get_access_token()
-    return f"Authorization successful. Access Token: {access_token}"
+    auth_url = f"{server_url}/api/v3/oauth2/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope=locations,notifications,devices,accounts,settings,geozones"
+    return redirect(auth_url)
 
-
+# OAuth callback route
 @app.route('/callback')
 def callback():
-    # Callback route to handle OAuth response and retrieve the code
     code = request.args.get('code')
     if not code:
         return "Authorization failed: No code received", 400
-    
-    return f"Authorization successful. Code: {code}"
 
+    # Use the authorization code to get the access token
+    access_token = do_login_and_get_access_token(code)
 
+    # Redirect to /devices with the access token as a query parameter
+    return redirect(f'/devices?access_token={access_token}')
+
+# Function to get the access token
+def do_login_and_get_access_token(code):
+    # Request token using the authorization code
+    token_url = f"{server_url}/api/v3/oauth2/token"
+    data = {
+        'client_id': client_id,
+        'client_secret': client_secret,
+        'code': code,
+        'redirect_uri': redirect_uri,
+        'grant_type': 'authorization_code'
+    }
+    response = requests.post(token_url, data=data)
+    response.raise_for_status()
+    return response.json().get('access_token')
+
+# The route that fetches the devices associated with the account
 @app.route('/devices')
 def get_devices():
-    # This route retrieves the devices once we have an access token
-    try:
-        access_token = do_login_and_get_access_token()
-        devices_resp = requests.get(
-            f"{server_url}/api/v3/accounts/{user_name}/devices",
-            headers={'Authorization': f'Bearer {access_token}'}
-        )
-        devices = devices_resp.json()
-        if not devices:
-            return jsonify({'error': 'No devices found in your account.'}), 404
-        return jsonify(devices)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    access_token = request.args.get('access_token')
+    if not access_token:
+        return jsonify({'error': 'Access token is missing.'}), 400
 
+    # Replace 'account_id' with your actual Trackimo account ID
+    account_id = "1367032"  # Replace with your actual account ID
 
+    # Make the API request to Trackimo API for device information
+    devices_resp = requests.get(
+        f"{server_url}/api/v3/accounts/{account_id}/devices",
+        headers={'Authorization': f'Bearer {access_token}'}
+    )
+
+    if devices_resp.status_code != 200:
+        return jsonify({'error': 'Failed to fetch devices', 'status_code': devices_resp.status_code}), 500
+
+    devices = devices_resp.json()
+    if not devices:
+        return jsonify({'error': 'No devices found in your account.'}), 404
+
+    return jsonify(devices)
+
+# Start the Flask app
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True)
