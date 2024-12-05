@@ -11,7 +11,7 @@ user_name = 'dan.uc.advisors@gmail.com'
 password = 'BuleBule222'
 client_id = '878b7a60-b504-44c5-bda9-bf6938c5fa29'
 client_secret = '58d898c4769c6b9f78c8a39db2feca97'
-redirect_uri = 'https://ivry100.onrender.com/callback'
+redirect_url = 'https://ivry100.onrender.com/callback'
 
 # The route that triggers the OAuth login flow
 @app.route('/')
